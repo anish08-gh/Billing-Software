@@ -11,6 +11,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 
@@ -18,12 +19,15 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    @Value("${app.cors.allowed-origin:http://localhost:5173}")
+    private String allowedOrigin;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of("http://localhost:5173")
+                List.of(allowedOrigin)
         );
 
         configuration.setAllowedMethods(

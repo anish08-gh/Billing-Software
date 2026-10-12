@@ -17,10 +17,15 @@ spring:
     enabled: true
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+
+app:
+  cors:
+    allowed-origin: ${APP_CORS_ALLOWED_ORIGIN:http://localhost:5173}
