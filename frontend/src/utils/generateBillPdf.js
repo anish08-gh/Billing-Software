@@ -203,11 +203,16 @@ function drawHeader(pdf, shopProfile, bill, logo, pageWidth) {
     }
   }
 
-  const shopName = textValue(shopProfile?.name, "SHREE DATTA FATAKA MART")
-    .trim()
-    .slice(0, 55);
 
-  const shopPhone = textValue(shopProfile?.phone, "");
+const shopName = textValue(shopProfile?.name, "SHREE DATTA FATAKA MART")
+  .trim()
+  .slice(0, 55);
+
+// Hard-coded details for the PDF only.
+const shopOwner = "Mayur Sawant";
+const shopPhone = textValue(shopProfile?.phone, "");
+const secondShopPhone = "9809099797";
+
 
   const centerX = pageWidth / 2 + (logo ? 5 : 0);
 
@@ -227,14 +232,25 @@ function drawHeader(pdf, shopProfile, bill, logo, pageWidth) {
     align: "center",
   });
 
-  if (shopPhone) {
-    pdf.setTextColor(...C.white);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(12);
-    pdf.text(`Contact: ${shopPhone}`, centerX, 27, {
-      align: "center",
-    });
-  }
+
+pdf.setTextColor(...C.white);
+pdf.setFont("helvetica", "normal");
+pdf.setFontSize(9);
+
+pdf.text(`Owner: ${shopOwner}`, centerX, 26, {
+  align: "center",
+});
+
+pdf.setFontSize(9);
+
+const contactNumbers = [shopPhone, secondShopPhone]
+  .filter((phone) => phone && phone.trim() !== "")
+  .join(" / ");
+
+pdf.text(`Contact: ${contactNumbers}`, centerX, 30, {
+  align: "center",
+});
+
 
   // Invoice and customer information cards.
   const gap = 5;
