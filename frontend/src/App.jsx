@@ -383,6 +383,9 @@ function BillDetailsPage() {
   const [catalogueItems, setCatalogueItems] = useState([]);
   const [editItemSearch, setEditItemSearch] = useState("");
   const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [editPendingItem, setEditPendingItem] = useState(null);
+  const [editQuantity, setEditQuantity] = useState("");
+  const editQuantityRef = useRef(null);
 
 
   useEffect(() => {
@@ -441,6 +444,12 @@ function BillDetailsPage() {
     }
   }, [billId]);
 
+
+  useEffect(() => {
+    if (editPendingItem && editQuantityRef.current) {
+      editQuantityRef.current.focus();
+    }
+  }, [editPendingItem]);
 
   async function handleSavePayment(event) {
     event.preventDefault();
@@ -518,6 +527,8 @@ function BillDetailsPage() {
 
     setEditError("");
     setEditItemSearch("");
+    setEditPendingItem(null);
+    setEditQuantity("");
     setCatalogueLoading(true);
     setIsEditing(true);
 
@@ -570,18 +581,57 @@ function BillDetailsPage() {
   }
 
   function handleAddEditItem(item) {
+    // Selecting a catalogue item opens quantity entry instead of adding it immediately.
+    setEditPendingItem(item);
+    setEditQuantity("");
+    setEditItemSearch("");
+    setEditError("");
+  }
+
+  function handleAddPendingEditItem() {
+    if (!editPendingItem) return;
+
+    const quantityText = editQuantity.trim();
+    const quantity = Number(quantityText);
+
+    if (
+      !quantityText ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !/^\d{1,7}(\.\d{1,3})?$/.test(quantityText)
+    ) {
+      setEditError("Enter a quantity greater than zero with up to 3 decimal places.");
+      editQuantityRef.current?.focus();
+      return;
+    }
+
     setEditItems((currentItems) => [
       ...currentItems,
       {
-        itemId: item.id,
-        itemName: item.name,
-        unit: item.unit,
-        quantity: "1",
-        unitPrice: Number(item.price),
+        itemId: editPendingItem.id,
+        itemName: editPendingItem.name,
+        unit: editPendingItem.unit,
+        quantity: quantityText,
+        unitPrice: Number(editPendingItem.price),
       },
     ]);
 
+    setEditPendingItem(null);
+    setEditQuantity("");
     setEditItemSearch("");
+    setEditError("");
+  }
+
+  function handleEditQuantityKeyDown(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleAddPendingEditItem();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setEditPendingItem(null);
+      setEditQuantity("");
+      setEditError("");
+    }
   }
 
   const filteredCatalogueItems = catalogueItems.filter((item) => {
@@ -639,46 +689,6 @@ function BillDetailsPage() {
           <>
             <h2>Edit Bill</h2>
 
-            <div className="form-group">
-              <label htmlFor="editItemSearch">Add Items from Catalogue</label>
-
-              <input
-                id="editItemSearch"
-                type="text"
-                value={editItemSearch}
-                onChange={(event) => setEditItemSearch(event.target.value)}
-                placeholder="Search by item name or SKU"
-                autoComplete="off"
-                disabled={catalogueLoading}
-              />
-
-              {catalogueLoading && <p>Loading catalogue...</p>}
-
-              {!catalogueLoading && editItemSearch.trim() && (
-                <div className="catalogue-search-results">
-                  {filteredCatalogueItems.length > 0 ? (
-                    filteredCatalogueItems.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="secondary-button"
-                        onClick={() => handleAddEditItem(item)}
-                      >
-                        {item.name} — ₹
-                        {Number(item.price).toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        {" "}({item.unit})
-                      </button>
-                    ))
-                  ) : (
-                    <p>No matching active items found.</p>
-                  )}
-                </div>
-              )}
-            </div>
-
             {editError && (
               <p className="form-error" role="alert">
                 {editError}
@@ -720,7 +730,12 @@ function BillDetailsPage() {
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => setIsEditing(false)}
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditPendingItem(null);
+                    setEditQuantity("");
+                    setEditItemSearch("");
+                  }}
                   disabled={savingEdit}
                 >
                   Cancel
@@ -819,6 +834,140 @@ function BillDetailsPage() {
 </tbody>
           </table>
         </div>
+
+        {isEditing && (
+          <div className="form-group" style={{ marginTop: "1.5rem" }}>
+            <h3>Add Items from Catalogue</h3>
+            <label htmlFor="editItemSearch">Search item name or SKU</label>
+
+            <div style={{ position: "relative" }}>
+              <input
+                id="editItemSearch"
+                type="text"
+                value={editItemSearch}
+                onChange={(event) => {
+                  setEditItemSearch(event.target.value);
+                  setEditPendingItem(null);
+                  setEditError("");
+                }}
+                placeholder="Start typing an item name..."
+                autoComplete="off"
+                disabled={catalogueLoading || Boolean(editPendingItem)}
+                style={{ width: "100%" }}
+              />
+
+              {catalogueLoading && <p className="muted">Loading catalogue...</p>}
+
+              {!catalogueLoading &&
+                editItemSearch.trim() &&
+                !editPendingItem && (
+                  <div
+                    className="catalogue-search-results"
+                    role="listbox"
+                    aria-label="Matching catalogue items"
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      zIndex: 20,
+                      maxHeight: "260px",
+                      overflowY: "auto",
+                      background: "#fff",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "8px",
+                      boxShadow: "0 8px 20px rgba(15, 23, 42, 0.15)",
+                      padding: "6px",
+                    }}
+                  >
+                    {filteredCatalogueItems.length > 0 ? (
+                      filteredCatalogueItems.slice(0, 12).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="secondary-button"
+                          role="option"
+                          onClick={() => handleAddEditItem(item)}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            margin: "2px 0",
+                            whiteSpace: "normal",
+                          }}
+                        >
+                          <strong>{item.name}</strong>
+                          {" — ₹"}
+                          {Number(item.price).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                          {" "}({item.unit})
+                          {item.sku ? ` · SKU: ${item.sku}` : ""}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="muted" style={{ padding: "8px", margin: 0 }}>
+                        No matching active items found, or the matching items are already in this bill.
+                      </p>
+                    )}
+                  </div>
+                )}
+            </div>
+
+            {editPendingItem && (
+              <div
+                className="content-card"
+                style={{ marginTop: "1rem", padding: "1rem" }}
+              >
+                <p style={{ marginTop: 0 }}>
+                  Selected: <strong>{editPendingItem.name}</strong>
+                  {" · "}
+                  ₹{Number(editPendingItem.price).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                  {" per "}{editPendingItem.unit}
+                </p>
+
+                <label htmlFor="editItemQuantity">Quantity</label>
+                <input
+                  ref={editQuantityRef}
+                  id="editItemQuantity"
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  value={editQuantity}
+                  onChange={(event) => setEditQuantity(event.target.value)}
+                  onKeyDown={handleEditQuantityKeyDown}
+                  placeholder="Enter quantity"
+                  style={{ width: "100%", maxWidth: "240px" }}
+                />
+
+                <div className="bill-details-actions" style={{ marginTop: "1rem" }}>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      setEditPendingItem(null);
+                      setEditQuantity("");
+                      setEditError("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={handleAddPendingEditItem}
+                  >
+                    Add to Bill
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="bill-summary">
           <p>Subtotal: <strong>{formatCurrency(bill.subtotal)}</strong></p>
